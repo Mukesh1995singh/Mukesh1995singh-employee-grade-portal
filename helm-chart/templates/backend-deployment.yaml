@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+
+kind: Deployment
+
+metadata:
+  name: {{ .Values.microservice.name }}-backend
+  namespace: {{ .Values.microservice.namespace }}
+  labels:
+    app: {{ .Values.microservice.name }}-backend
+
+spec:
+  replicas: {{ .Values.microservice.replicas }}
+
+  selector:
+    matchLabels:
+      app: {{ .Values.microservice.name }}-backend
+
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.microservice.name }}-backend
+
+    spec:
+      containers:
+        - name: backend
+
+          image: {{ .Values.backend.image }}
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - name: http
+              containerPort: {{ .Values.backend.port }}
+              protocol: TCP
+
+          env:
+            - name: APP_ENV
+              value: {{ .Values.env.APP_ENV | quote }}
+
+          resources:
+            {{- toYaml .Values.backend.resources | nindent 12 }}
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: {{ .Values.backend.livenessDelay | default 15 }}
+            periodSeconds: 20

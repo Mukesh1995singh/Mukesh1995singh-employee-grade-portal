@@ -1,0 +1,6 @@
+apiVersion: v2
+name: employee-grade-portal
+description: A Helm chart for employee grade portal microservice
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

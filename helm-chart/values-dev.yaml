@@ -1,0 +1,11 @@
+env:
+  APP_ENV: dev
+
+ingress:
+  hosts:
+    - host: employee-grade-dev.local
+      paths:
+        - path: /api
+          pathType: Prefix
+        - path: /
+          pathType: Prefix

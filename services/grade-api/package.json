@@ -1,0 +1,12 @@
+{
+  "name": "employee-grade-api",
+  "version": "1.0.0",
+  "description": "Grade API microservice for Employee Grade Portal",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "express": "^5.1.0"
+  }
+}

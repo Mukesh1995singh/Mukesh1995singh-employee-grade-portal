@@ -1,0 +1,19 @@
+microservice:
+  replicas: 3
+
+env:
+  APP_ENV: prod
+
+ingress:
+  hosts:
+    - host: employee-grade.com   # Your real production domain
+      paths:
+        - path: /api
+          pathType: Prefix
+        - path: /
+          pathType: Prefix
+
+autoscaling:
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
