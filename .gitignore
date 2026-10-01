@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 # Node.js
 node_modules/
 npm-debug.log*
@@ -80,12 +80,6 @@ web_modules/
 .yarn-integrity
 
 # dotenv environment variable files
->>>>>>> ea83931031f67767b1e5c602d62875500da2b16a
-.env
-.env.*
-!.env.example
-
-<<<<<<< HEAD
 # IDE / OS
 .vscode/
 .idea/
