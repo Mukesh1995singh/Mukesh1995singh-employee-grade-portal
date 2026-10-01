@@ -1,0 +1,143 @@
+trigger:
+  branches:
+    include:
+      - main
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+- group: employee-grade-ci
+
+stages:
+
+# =========================================================
+# CI
+# =========================================================
+
+- stage: CI
+  displayName: 'CI - Code Quality and Security'
+
+  jobs:
+
+  - job: Build_Test_Scan
+    displayName: 'Build, Test, SonarQube and Mend'
+
+    steps:
+
+    # -----------------------------------------------------
+    # Checkout
+    # -----------------------------------------------------
+
+    - checkout: self
+      displayName: 'Checkout source code'
+
+    # -----------------------------------------------------
+    # Node.js
+    # -----------------------------------------------------
+
+    - task: NodeTool@0
+      displayName: 'Install Node.js'
+      inputs:
+        versionSpec: '24.x'
+
+    # -----------------------------------------------------
+    # SonarQube - Prepare
+    # -----------------------------------------------------
+
+    - task: SonarQubePrepare@7
+      displayName: 'SonarQube - Prepare Analysis'
+      inputs:
+        SonarQube: 'SonarQube-Cloud'
+        scannerMode: 'cli'
+        configMode: 'manual'
+        cliProjectKey: 'devops08011995_employee-grade-portal'
+        cliProjectName: 'Employee Grade Portal'
+        cliSources: '.'
+
+    # -----------------------------------------------------
+    # Mend
+    # -----------------------------------------------------
+
+    - task: WhiteSource@21
+      displayName: 'Mend - Dependency Security Scan'
+      inputs:
+        cwd: '$(System.DefaultWorkingDirectory)'
+        projectName: 'Employee Grade Portal'
+
+    # -----------------------------------------------------
+    # Backend - Install dependencies
+    # -----------------------------------------------------
+
+    - script: |
+        cd services/grade-api
+        npm ci
+      displayName: 'Install backend dependencies'
+
+    # -----------------------------------------------------
+    # Backend - Tests + Coverage
+    # -----------------------------------------------------
+
+    - script: |
+        cd services/grade-api
+        npm test --if-present
+      displayName: 'Run backend tests'
+
+    # -----------------------------------------------------
+    # Backend - Test report
+    # -----------------------------------------------------
+
+    - task: PublishTestResults@2
+      displayName: 'Publish backend test results'
+      condition: succeededOrFailed()
+      inputs:
+        testResultsFormat: 'JUnit'
+        testResultsFiles: 'services/grade-api/test-results/*.xml'
+        failTaskOnFailedTests: false
+        testRunTitle: 'Backend Tests'
+
+    # -----------------------------------------------------
+    # Backend - Code coverage
+    # -----------------------------------------------------
+
+    - task: PublishCodeCoverageResults@2
+      displayName: 'Publish backend code coverage'
+      condition: succeededOrFailed()
+      inputs:
+        summaryFileLocation: 'services/grade-api/coverage/cobertura-coverage.xml'
+        pathToSources: 'services/grade-api'
+        failIfCoverageEmpty: false
+
+    # -----------------------------------------------------
+    # Frontend - Install dependencies
+    # -----------------------------------------------------
+
+    - script: |
+        cd services/frontend
+        npm ci
+      displayName: 'Install frontend dependencies'
+
+    # -----------------------------------------------------
+    # Frontend - Build
+    # -----------------------------------------------------
+
+    - script: |
+        cd services/frontend
+        npm run build
+      displayName: 'Build frontend'
+
+    # -----------------------------------------------------
+    # SonarQube - Analyze
+    # -----------------------------------------------------
+
+    - task: SonarQubeAnalyze@7
+      displayName: 'SonarQube - Analyze'
+
+    # -----------------------------------------------------
+    # SonarQube - Quality Gate
+    # -----------------------------------------------------
+
+    - task: SonarQubePublish@7
+      displayName: 'SonarQube - Publish Quality Gate'
+      inputs:
+        pollingTimeoutSec: '300'

@@ -122,6 +122,10 @@ app.post("/api/grades", (req, res) => {
     res.status(201).json(newGrade);
 });
 
-app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Grade API running on port ${PORT}`);
-});
+if (require.main === module) {
+    app.listen(PORT, "0.0.0.0", () => {
+        console.log(`Grade API running on port ${PORT}`);
+    });
+}
+
+module.exports = app;
