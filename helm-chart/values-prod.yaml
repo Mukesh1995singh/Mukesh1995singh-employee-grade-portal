@@ -6,7 +6,7 @@ env:
 
 ingress:
   hosts:
-    - host: employee-grade.com   # Your real production domain
+    - host: employee-grade.com
       paths:
         - path: /api
           pathType: Prefix
@@ -15,5 +15,5 @@ ingress:
 
 autoscaling:
   minReplicas: 3
-  maxReplicas: 10
+  maxReplicas: 5
   targetCPUUtilizationPercentage: 80
