@@ -1,49 +1,57 @@
+
 trigger:
   branches:
     include:
       - main
 
+#define pr also
+
+# Temporary: Microsoft-hosted agent until the Azure VM self-hosted agent
+# is configured in Azure DevOps.
 pool:
-  vmImage: ubuntu-latest
+  vmImage: 'ubuntu-latest'
 
 variables:
-- group: employee-grade-ci
+  - group: employee-grade-ci
+
+  - name: imageTag
+    value: '$(Build.BuildId)'
 
 stages:
 
 # =========================================================
-# CI
+# CI STAGE
 # =========================================================
 
 - stage: CI
-  displayName: 'CI - Code Quality and Security'
+  displayName: 'CI - Build, Test, Security and Container Scan'
 
   jobs:
 
   - job: Build_Test_Scan
-    displayName: 'Build, Test, SonarQube and Mend'
+    displayName: 'Build, Test, SonarQube, Mend and Trivy'
 
     steps:
 
-    # -----------------------------------------------------
+    # =====================================================
     # Checkout
-    # -----------------------------------------------------
+    # =====================================================
 
     - checkout: self
       displayName: 'Checkout source code'
 
-    # -----------------------------------------------------
+    # =====================================================
     # Node.js
-    # -----------------------------------------------------
+    # =====================================================
 
     - task: NodeTool@0
-      displayName: 'Install Node.js'
+      displayName: 'Install Node.js 24'
       inputs:
         versionSpec: '24.x'
 
-    # -----------------------------------------------------
+    # =====================================================
     # SonarQube - Prepare
-    # -----------------------------------------------------
+    # =====================================================
 
     - task: SonarQubePrepare@7
       displayName: 'SonarQube - Prepare Analysis'
@@ -55,9 +63,9 @@ stages:
         cliProjectName: 'Employee Grade Portal'
         cliSources: '.'
 
-    # -----------------------------------------------------
+    # =====================================================
     # Mend
-    # -----------------------------------------------------
+    # =====================================================
 
     - task: WhiteSource@21
       displayName: 'Mend - Dependency Security Scan'
@@ -65,27 +73,27 @@ stages:
         cwd: '$(System.DefaultWorkingDirectory)'
         projectName: 'Employee Grade Portal'
 
-    # -----------------------------------------------------
-    # Backend - Install dependencies
-    # -----------------------------------------------------
+    # =====================================================
+    # Backend - Install
+    # =====================================================
 
     - script: |
         cd services/grade-api
         npm ci
       displayName: 'Install backend dependencies'
 
-    # -----------------------------------------------------
-    # Backend - Tests + Coverage
-    # -----------------------------------------------------
+    # =====================================================
+    # Backend - Tests
+    # =====================================================
 
     - script: |
         cd services/grade-api
         npm test --if-present
       displayName: 'Run backend tests'
 
-    # -----------------------------------------------------
-    # Backend - Test report
-    # -----------------------------------------------------
+    # =====================================================
+    # Backend - Test Results
+    # =====================================================
 
     - task: PublishTestResults@2
       displayName: 'Publish backend test results'
@@ -94,11 +102,11 @@ stages:
         testResultsFormat: 'JUnit'
         testResultsFiles: 'services/grade-api/test-results/*.xml'
         failTaskOnFailedTests: false
-        testRunTitle: 'Backend Tests'
+        testRunTitle: 'Employee Grade Portal - Backend Tests'
 
-    # -----------------------------------------------------
-    # Backend - Code coverage
-    # -----------------------------------------------------
+    # =====================================================
+    # Backend - Code Coverage
+    # =====================================================
 
     - task: PublishCodeCoverageResults@2
       displayName: 'Publish backend code coverage'
@@ -108,36 +116,150 @@ stages:
         pathToSources: 'services/grade-api'
         failIfCoverageEmpty: false
 
-    # -----------------------------------------------------
-    # Frontend - Install dependencies
-    # -----------------------------------------------------
+    # =====================================================
+    # Frontend - Install
+    # =====================================================
 
     - script: |
         cd services/frontend
         npm ci
       displayName: 'Install frontend dependencies'
 
-    # -----------------------------------------------------
+    # =====================================================
     # Frontend - Build
-    # -----------------------------------------------------
+    # =====================================================
 
     - script: |
         cd services/frontend
         npm run build
       displayName: 'Build frontend'
 
-    # -----------------------------------------------------
+    # =====================================================
     # SonarQube - Analyze
-    # -----------------------------------------------------
+    # =====================================================
 
     - task: SonarQubeAnalyze@7
       displayName: 'SonarQube - Analyze'
 
-    # -----------------------------------------------------
+    # =====================================================
     # SonarQube - Quality Gate
-    # -----------------------------------------------------
+    # =====================================================
 
     - task: SonarQubePublish@7
       displayName: 'SonarQube - Publish Quality Gate'
       inputs:
         pollingTimeoutSec: '300'
+
+    # =====================================================
+    # Docker - Build Frontend
+    # =====================================================
+
+    - task: Docker@2
+      displayName: 'Docker - Build frontend image'
+      inputs:
+        command: 'build'
+        repository: '$(frontendImageName)'
+        Dockerfile: 'services/frontend/Dockerfile'
+        buildContext: 'services/frontend'
+        tags: |
+          $(imageTag)
+
+    # =====================================================
+    # Docker - Build Backend
+    # =====================================================
+
+    - task: Docker@2
+      displayName: 'Docker - Build backend image'
+      inputs:
+        command: 'build'
+        repository: '$(backendImageName)'
+        Dockerfile: 'services/grade-api/Dockerfile'
+        buildContext: 'services/grade-api'
+        tags: |
+          $(imageTag)
+
+    # =====================================================
+    # Trivy - Scan Frontend
+    # =====================================================
+
+    - script: |
+        trivy image \
+          --severity HIGH,CRITICAL \
+          --exit-code 1 \
+          $(frontendImageName):$(imageTag)
+      displayName: 'Trivy - Scan frontend image'
+
+    # =====================================================
+    # Trivy - Scan Backend
+    # =====================================================
+
+    - script: |
+        trivy image \
+          --severity HIGH,CRITICAL \
+          --exit-code 1 \
+          $(backendImageName):$(imageTag)
+      displayName: 'Trivy - Scan backend image'
+
+    # =====================================================
+    # Docker - Login to Azure Container Registry
+    # =====================================================
+
+    - task: Docker@2
+      displayName: 'Docker - Login to ACR'
+      inputs:
+        command: 'login'
+        containerRegistry: '$(dockerRegistryServiceConnection)'
+
+    # =====================================================
+    # Docker - Tag Frontend
+    # =====================================================
+
+    - script: |
+        docker tag \
+          $(frontendImageName):$(imageTag) \
+          $(containerRegistry)/$(frontendImageName):$(imageTag)
+      displayName: 'Docker - Tag frontend image'
+
+    # =====================================================
+    # Docker - Tag Backend
+    # =====================================================
+
+    - script: |
+        docker tag \
+          $(backendImageName):$(imageTag) \
+          $(containerRegistry)/$(backendImageName):$(imageTag)
+      displayName: 'Docker - Tag backend image'
+
+    # =====================================================
+    # Docker - Push Frontend
+    # =====================================================
+
+    - task: Docker@2
+      displayName: 'Docker - Push frontend image to ACR'
+      inputs:
+        command: 'push'
+        repository: '$(containerRegistry)/$(frontendImageName)'
+        tags: |
+          $(imageTag)
+
+    # =====================================================
+    # Docker - Push Backend
+    # =====================================================
+
+    - task: Docker@2
+      displayName: 'Docker - Push backend image to ACR'
+      inputs:
+        command: 'push'
+        repository: '$(containerRegistry)/$(backendImageName)'
+        tags: |
+          $(imageTag)
+
+    # =====================================================
+    # Docker - Logout
+    # =====================================================
+
+    - task: Docker@2
+      displayName: 'Docker - Logout from ACR'
+      inputs:
+        command: 'logout'
+        containerRegistry: '$(dockerRegistryServiceConnection)'

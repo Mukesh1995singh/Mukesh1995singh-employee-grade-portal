@@ -1,0 +1,267 @@
+trigger: none
+
+resources:
+  pipelines:
+    - pipeline: employeeGradeCI
+      source: 'Employee Grade CI'
+      trigger:
+        branches:
+          include:
+            - main
+
+# Temporary Microsoft-hosted agent.
+# Change to your self-hosted pool after agent setup.
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  - group: employee-grade-ci
+
+stages:
+
+# =========================================================
+# DEV DEPLOYMENT
+# =========================================================
+
+- stage: DEV
+  displayName: 'Deploy to DEV'
+
+  jobs:
+
+  - deployment: Deploy_DEV
+    displayName: 'Helm Deploy - DEV'
+    environment: 'employee-grade-dev'
+
+    strategy:
+      runOnce:
+        deploy:
+
+          steps:
+
+          - checkout: self
+            displayName: 'Checkout source code'
+
+          - task: AzureCLI@2
+            displayName: 'Connect to AKS'
+            inputs:
+              azureSubscription: '$(azureServiceConnection)'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                az aks get-credentials \
+                  --resource-group $(aksResourceGroup) \
+                  --name $(aksName) \
+                  --overwrite-existing
+
+                kubelogin convert-kubeconfig -l azurecli
+
+          - script: |
+              helm upgrade --install $(helmReleaseName) \
+                $(helmChartPath) \
+                --namespace employee-dev \
+                --create-namespace \
+                --values $(helmChartPath)/values-dev.yaml \
+                --set frontend.image.repository=$(containerRegistry)/$(frontendImageName) \
+                --set frontend.image.tag=$(resources.pipeline.employeeGradeCI.runID) \
+                --set api.image.repository=$(containerRegistry)/$(backendImageName) \
+                --set api.image.tag=$(resources.pipeline.employeeGradeCI.runID) \
+                --wait \
+                --timeout 5m
+            displayName: 'Helm 3 - Deploy DEV'
+
+
+# =========================================================
+# DEV SMOKE TEST
+# =========================================================
+
+- stage: SMOKE_TEST
+  displayName: 'Smoke Test - DEV'
+  dependsOn: DEV
+  condition: succeeded()
+
+  jobs:
+
+  - job: Smoke_Test
+    displayName: 'DEV Application Smoke Test'
+
+    steps:
+
+    - checkout: none
+
+    - task: AzureCLI@2
+      displayName: 'Connect to AKS'
+      inputs:
+        azureSubscription: '$(azureServiceConnection)'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          az aks get-credentials \
+            --resource-group $(aksResourceGroup) \
+            --name $(aksName) \
+            --overwrite-existing
+
+          kubelogin convert-kubeconfig -l azurecli
+
+    # -----------------------------------------------------
+    # Backend smoke test
+    # -----------------------------------------------------
+
+    - script: |
+        set -e
+
+        echo "Checking backend pods..."
+
+        kubectl get pods \
+          -n employee-dev \
+          -l app=employee-grade-api
+
+        echo "Running backend health check..."
+
+        kubectl run smoke-test-api \
+          --rm \
+          --restart=Never \
+          --image=curlimages/curl:latest \
+          -n employee-dev \
+          -- \
+          curl --fail --silent --show-error \
+          http://employee-grade-api:3000/health
+
+        echo "Backend smoke test passed."
+      displayName: 'Smoke Test - Backend Health'
+
+    # -----------------------------------------------------
+    # Frontend smoke test
+    # -----------------------------------------------------
+
+    - script: |
+        set -e
+
+        echo "Checking frontend service..."
+
+        kubectl get svc \
+          -n employee-dev \
+          employee-grade-frontend
+
+        echo "Running frontend health check..."
+
+        kubectl run smoke-test-frontend \
+          --rm \
+          --restart=Never \
+          --image=curlimages/curl:latest \
+          -n employee-dev \
+          -- \
+          curl --fail --silent --show-error \
+          http://employee-grade-frontend:5001/
+
+        echo "Frontend smoke test passed."
+      displayName: 'Smoke Test - Frontend'
+
+
+# =========================================================
+# TEST DEPLOYMENT
+# =========================================================
+
+- stage: TEST
+  displayName: 'Deploy to TEST'
+  dependsOn: SMOKE_TEST
+  condition: succeeded()
+
+  jobs:
+
+  - deployment: Deploy_TEST
+    displayName: 'Helm Deploy - TEST'
+    environment: 'employee-grade-test'
+
+    strategy:
+      runOnce:
+        deploy:
+
+          steps:
+
+          - checkout: self
+            displayName: 'Checkout source code'
+
+          - task: AzureCLI@2
+            displayName: 'Connect to AKS'
+            inputs:
+              azureSubscription: '$(azureServiceConnection)'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                az aks get-credentials \
+                  --resource-group $(aksResourceGroup) \
+                  --name $(aksName) \
+                  --overwrite-existing
+
+                kubelogin convert-kubeconfig -l azurecli
+
+          - script: |
+              helm upgrade --install $(helmReleaseName) \
+                $(helmChartPath) \
+                --namespace employee-test \
+                --create-namespace \
+                --values $(helmChartPath)/values-test.yaml \
+                --set frontend.image.repository=$(containerRegistry)/$(frontendImageName) \
+                --set frontend.image.tag=$(resources.pipeline.employeeGradeCI.runID) \
+                --set api.image.repository=$(containerRegistry)/$(backendImageName) \
+                --set api.image.tag=$(resources.pipeline.employeeGradeCI.runID) \
+                --wait \
+                --timeout 5m
+            displayName: 'Helm 3 - Deploy TEST'
+
+
+# =========================================================
+# PROD DEPLOYMENT
+# =========================================================
+# Approval is configured on Azure DevOps Environment:
+# employee-grade-prod
+# =========================================================
+
+- stage: PROD
+  displayName: 'Deploy to PROD'
+  dependsOn: TEST
+  condition: succeeded()
+
+  jobs:
+
+  - deployment: Deploy_PROD
+    displayName: 'Helm Deploy - PROD'
+
+    environment: 'employee-grade-prod'
+
+    strategy:
+      runOnce:
+        deploy:
+
+          steps:
+
+          - checkout: self
+            displayName: 'Checkout source code'
+
+          - task: AzureCLI@2
+            displayName: 'Connect to AKS'
+            inputs:
+              azureSubscription: '$(azureServiceConnection)'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                az aks get-credentials \
+                  --resource-group $(aksResourceGroup) \
+                  --name $(aksName) \
+                  --overwrite-existing
+
+                kubelogin convert-kubeconfig -l azurecli
+
+          - script: |
+              helm upgrade --install $(helmReleaseName) \
+                $(helmChartPath) \
+                --namespace employee-prod \
+                --create-namespace \
+                --values $(helmChartPath)/values-prod.yaml \
+                --set frontend.image.repository=$(containerRegistry)/$(frontendImageName) \
+                --set frontend.image.tag=$(resources.pipeline.employeeGradeCI.runID) \
+                --set api.image.repository=$(containerRegistry)/$(backendImageName) \
+                --set api.image.tag=$(resources.pipeline.employeeGradeCI.runID) \
+                --wait \
+                --timeout 5m
+            displayName: 'Helm 3 - Deploy PROD'

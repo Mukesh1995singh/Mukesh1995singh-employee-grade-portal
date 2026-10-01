@@ -8,17 +8,19 @@ module "resource_group" {
 module "network" {
   source = "./modules/network"
 
-  vnet_name                 = var.vnet_name
-  location                  = var.location
-  resource_group_name       = module.resource_group.resource_group_name
-  address_space             = var.address_space
-  subnet_name               = var.subnet_name
-  subnet_address_prefixes   = var.subnet_address_prefixes
+  vnet_name               = var.vnet_name
+  location                = var.location
+  resource_group_name     = module.resource_group.resource_group_name
+  address_space           = var.address_space
+  subnet_name             = var.subnet_name
+  subnet_address_prefixes = var.subnet_address_prefixes
 
-  depends_on = [
-    module.resource_group
-  ]
+  agent_subnet_name             = var.agent_subnet_name
+  agent_subnet_address_prefixes = var.agent_subnet_address_prefixes
+
+  depends_on = [module.resource_group]
 }
+
 
 module "acr" {
   source = "./modules/acr"
@@ -52,12 +54,27 @@ module "aks" {
 module "keyvault" {
   source = "./modules/keyvault"
 
-  keyvault_name      = var.keyvault_name
+  keyvault_name       = var.keyvault_name
   resource_group_name = module.resource_group.resource_group_name
   location            = var.location
   tenant_id           = var.tenant_id
 
   depends_on = [
     module.resource_group
+  ]
+}
+
+module "agent_vm" {
+  source = "./modules/agent-vm"
+
+  vm_name             = var.agent_vm_name
+  location            = var.location
+  resource_group_name = module.resource_group.resource_group_name
+  subnet_id           = module.network.agent_subnet_id
+  admin_username      = var.agent_admin_username
+  admin_password      = var.agent_admin_password
+
+  depends_on = [
+    module.network
   ]
 }

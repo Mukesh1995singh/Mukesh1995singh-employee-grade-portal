@@ -27,3 +27,13 @@ variable "subnet_address_prefixes" {
   description = "Address prefixes for the AKS subnet"
   type        = list(string)
 }
+
+variable "agent_subnet_name" {
+  description = "Name of the Azure DevOps agent subnet"
+  type        = string
+}
+
+variable "agent_subnet_address_prefixes" {
+  description = "Address prefixes for the Azure DevOps agent subnet"
+  type        = list(string)
+}

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="jest tests" tests="5" failures="0" errors="0" time="1.134">
+  <testsuite name="Employee Grade API" errors="0" failures="0" skipped="0" timestamp="2026-10-01T06:43:17" time="0.91" tests="5">
+    <testcase classname="Employee Grade API GET /health should return service status" name="Employee Grade API GET /health should return service status" time="0.046">
+    </testcase>
+    <testcase classname="Employee Grade API GET /api/grades should return grades" name="Employee Grade API GET /api/grades should return grades" time="0.006">
+    </testcase>
+    <testcase classname="Employee Grade API POST /api/grades should create a new grade" name="Employee Grade API POST /api/grades should create a new grade" time="0.026">
+    </testcase>
+    <testcase classname="Employee Grade API POST /api/grades should return 400 for missing fields" name="Employee Grade API POST /api/grades should return 400 for missing fields" time="0.006">
+    </testcase>
+    <testcase classname="Employee Grade API POST /api/grades should calculate A+ grade for score 90 or above" name="Employee Grade API POST /api/grades should calculate A+ grade for score 90 or above" time="0.005">
+    </testcase>
+  </testsuite>
+</testsuites>

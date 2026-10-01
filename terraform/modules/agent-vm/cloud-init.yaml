@@ -1,0 +1,54 @@
+#cloud-config
+
+package_update: true
+package_upgrade: false
+
+packages:
+  - ca-certificates
+  - curl
+  - wget
+  - git
+  - unzip
+  - apt-transport-https
+  - gnupg
+  - lsb-release
+  - jq
+
+runcmd:
+
+  # Docker
+  - curl -fsSL https://get.docker.com | sh
+  - systemctl enable docker
+  - systemctl start docker
+  - usermod -aG docker mukesh
+
+  # Azure CLI
+  - curl -sL https://aka.ms/InstallAzureCLIDeb | bash
+
+  # kubectl
+  - az aks install-cli
+
+  # Helm 3
+  - curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+  # Node.js 24
+  - curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
+  - apt-get install -y nodejs
+
+  # Trivy
+  - wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | gpg --dearmor -o /usr/share/keyrings/trivy.gpg
+  - echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" > /etc/apt/sources.list.d/trivy.list
+  - apt-get update
+  - apt-get install -y trivy
+
+  # Versions / installation verification
+  - docker --version
+  - az version
+  - kubectl version --client
+  - helm version
+  - node --version
+  - npm --version
+  - trivy --version
+  - git --version
+
+  - echo "Azure DevOps self-hosted agent prerequisites installed successfully" | tee /etc/agent-init-status

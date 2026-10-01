@@ -70,3 +70,29 @@ variable "tenant_id" {
   description = "Azure AD tenant ID"
   type        = string
 }
+
+variable "agent_subnet_name" {
+  description = "Name of the Azure DevOps agent subnet"
+  type        = string
+}
+
+variable "agent_subnet_address_prefixes" {
+  description = "Address prefixes for the Azure DevOps agent subnet"
+  type        = list(string)
+}
+
+variable "agent_vm_name" {
+  description = "Name of the Azure DevOps self-hosted agent VM"
+  type        = string
+}
+
+variable "agent_admin_username" {
+  description = "Administrator username for the agent VM"
+  type        = string
+}
+
+variable "agent_admin_password" {
+  description = "Administrator password for the Azure DevOps agent VM"
+  type        = string
+  sensitive   = true
+}

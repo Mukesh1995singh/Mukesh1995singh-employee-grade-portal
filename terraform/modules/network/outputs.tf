@@ -12,3 +12,8 @@ output "aks_subnet_id" {
   description = "Resource ID of the AKS subnet"
   value       = azurerm_subnet.aks.id
 }
+
+output "agent_subnet_id" {
+  description = "Resource ID of the Azure DevOps agent subnet"
+  value       = azurerm_subnet.agent.id
+}
