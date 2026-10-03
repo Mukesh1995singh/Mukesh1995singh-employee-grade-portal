@@ -4,7 +4,10 @@ trigger:
     include:
       - main
 
-#define pr also
+pr:
+  branches:
+    include:
+      - main
 
 # Temporary: Microsoft-hosted agent until the Azure VM self-hosted agent
 # is configured in Azure DevOps.
